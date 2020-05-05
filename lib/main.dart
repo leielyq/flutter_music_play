@@ -1,21 +1,47 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:audioplayers/audio_cache.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/src/rendering/sliver.dart';
 import 'package:flutter/src/rendering/sliver_grid.dart';
 import 'package:flutterpage/Page.dart';
 import 'package:listenme/Global.dart';
+import 'package:listenme/MyTabIndicator.dart';
 import 'package:listenme/NetWork.dart';
 import 'package:listenme/model/play_list_entity.dart';
+import 'package:listenme/search.dart';
+import 'package:listenme/ui/play_list_page.dart';
 import 'package:provider/provider.dart';
-
+import 'package:pull_to_refresh/pull_to_refresh.dart';
+import 'db/DatabaseProvider.dart';
 import 'model/music_entity.dart';
 
-void main() => runApp(MyApp());
+void main() {
+  _setTargetPlatformForDesktop();
+  runApp(MyApp());
+}
 
-AudioPlayer audioPlayer = AudioPlayer();
+void _setTargetPlatformForDesktop() {
+  TargetPlatform targetPlatform;
+  if (Platform.isMacOS) {
+    targetPlatform = TargetPlatform.iOS;
+  } else if (Platform.isLinux || Platform.isWindows) {
+    targetPlatform = TargetPlatform.android;
+  }
+  if (targetPlatform != null) {
+    debugDefaultTargetPlatformOverride = targetPlatform;
+  }
+
+}
+
+AudioPlayer audioPlayer = AudioPlayer(mode: PlayerMode.MEDIA_PLAYER);
 AudioCache audioCache = AudioCache();
+
+MusicEntity currentMusic;
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
@@ -24,8 +50,7 @@ class MyApp extends StatelessWidget {
     NetWork.init();
 
     return MultiProvider(
-      child:
-      MaterialApp(
+      child: MaterialApp(
         title: 'Flutter Demo',
         theme: ThemeData(
           primarySwatch: Colors.blue,
@@ -33,11 +58,11 @@ class MyApp extends StatelessWidget {
         home: MyHomePage(title: 'Flutter Demo Home Page'),
       ),
       providers: [
+        Provider(create: (_) => DatabaseProvider()),
         StreamProvider<Duration>.value(
             initialData: Duration(), value: audioPlayer.onAudioPositionChanged),
       ],
     );
-
   }
 }
 
@@ -51,13 +76,10 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends PageState<MyHomePage> {
-  MusicEntity currentMusic;
-
   @override
   void initState() {
     super.initState();
     if (kIsWeb) {
-      // Calls to Platform.isIOS fails on web
       return;
     }
     if (App.isiOS) {
@@ -66,6 +88,11 @@ class _MyHomePageState extends PageState<MyHomePage> {
       }
       audioPlayer.startHeadlessService();
     }
+
+    audioPlayer.setReleaseMode(ReleaseMode.LOOP);
+
+    audioPlayer.onPlayerStateChanged
+        .listen((AudioPlayerState s) => {print('Current player state: $s')});
   }
 
   @override
@@ -73,32 +100,106 @@ class _MyHomePageState extends PageState<MyHomePage> {
     return NetWork.getMusicList(page, 10);
   }
 
+  int _angle = 0;
+
   @override
   Widget buildTwoLevelWidget() {
     if (currentMusic == null) {
       return null;
     }
-
-    return Scaffold(
-      body: Column(
-        children: <Widget>[
-          ListTile(
-            leading: Image.network(
-              currentMusic.picUrl,
-              width: 50,
-            ),
-            title: Text(currentMusic.name),
-            subtitle: Row(
-              children:
-                  currentMusic.artists.map((res) => Text(res.name)).toList(),
-            ),
+    return DefaultTabController(
+      child: Scaffold(
+        backgroundColor: Theme.of(context).cardColor,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          title: Container(
+            child: TabBar(
+                unselectedLabelColor: Colors.grey,
+                indicator:
+                    MyTabIndicator(color: Theme.of(context).primaryColor),
+                tabs: [
+                  Tab(
+                    icon: Icon(Icons.album),
+                  ),
+                  Tab(
+                    icon: Icon(Icons.book),
+                  )
+                ]),
           ),
-          Flexible(child: Text('歌词')),
-          Advanced(
-            advancedPlayer: audioPlayer,
-          )
-        ],
+        ),
+        bottomNavigationBar: FutureBuilder(
+          future: audioPlayer.getDuration(),
+          builder: (BuildContext context, AsyncSnapshot snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircularProgressIndicator();
+            }
+            return Container(
+              height: 200,
+              child: ToolWidget(
+                total: snapshot.data.toDouble(),
+              ),
+            );
+          },
+        ),
+        body: Column(
+          children: <Widget>[
+            Flexible(
+              child: TabBarView(children: [
+                ListView(
+                  children: <Widget>[
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _angle == 0 ? _angle = 90 : _angle = 0;
+                        });
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 60),
+                        child: AnimatedContainer(
+                          transform: Matrix4.identity()..rotateZ(0),
+                          child: ClipOval(
+                            child: Container(
+                              width: 200,
+                              child: Image.network(
+                                currentMusic.picUrl,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          duration: Duration(seconds: 1),
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      title: Text(currentMusic.name),
+                      subtitle: Row(
+                        children: currentMusic.artists
+                            .map((res) => Text(res.name))
+                            .toList(),
+                      ),
+                    ),
+                  ],
+                ),
+                ListView(
+                  children: <Widget>[
+                    FutureBuilder(
+                      future: NetWork.getMusicLyric(currentMusic.cid),
+                      builder: (BuildContext context, AsyncSnapshot snapshot) {
+                        if (ConnectionState.waiting ==
+                            snapshot.connectionState) {
+                          return CircularProgressIndicator();
+                        }
+                        return Text(snapshot.data.toString());
+                      },
+                    )
+                  ],
+                ),
+              ]),
+            )
+          ],
+        ),
       ),
+      length: 2,
     );
   }
 
@@ -106,6 +207,38 @@ class _MyHomePageState extends PageState<MyHomePage> {
   Widget buildBody() {
     return CustomScrollView(
       slivers: <Widget>[
+        SliverAppBar(
+          title: currentMusic == null
+              ? Text('Listen Me')
+              : IconButton(
+                  icon: Icon(Icons.vertical_align_bottom),
+                  onPressed: () {
+                    openTwoWidget();
+                  }),
+          actions: <Widget>[
+            IconButton(
+                icon: Icon(Icons.list),
+                onPressed: () {
+                  Navigator.of(context).push(
+                      CupertinoPageRoute(builder: (context) => PlayListPage()));
+                })
+          ],
+        ),
+        SliverToBoxAdapter(
+          child: RawMaterialButton(
+            child: Hero(
+              child: Text(
+                '搜索',
+                style: Theme.of(context).textTheme.title,
+              ),
+              tag: 'search',
+            ),
+            onPressed: () {
+              Navigator.of(context)
+                  .push(CupertinoPageRoute(builder: (context) => Search()));
+            },
+          ),
+        ),
         SliverToBoxAdapter(
           child: Text(
             'Today',
@@ -124,18 +257,166 @@ class _MyHomePageState extends PageState<MyHomePage> {
                   setState(() {
                     currentMusic = item;
                   });
+                  audioPlayer.stop();
                   audioPlayer.play(currentMusic.url);
+                  openTwoWidget();
                 },
               ),
             );
           }, childCount: pageData.length),
           gridDelegate:
-          SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
+              SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
         ),
       ],
     );
+  }
+}
 
+class ToolWidget extends StatefulWidget {
+  final total;
 
+  const ToolWidget({
+    Key key,
+    this.total,
+  }) : super(key: key);
+
+  @override
+  _ToolWidgetState createState() => _ToolWidgetState();
+}
+
+class _ToolWidgetState extends State<ToolWidget> {
+  StreamController<AudioPlayerState> streamController = StreamController();
+
+  @override
+  void initState() {
+    super.initState();
+    audioPlayer.onPlayerStateChanged.listen((AudioPlayerState s) {
+      print('Current player state: $s');
+      streamController.sink.add(s);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final audioPosition = Provider.of<Duration>(context);
+//    print(audioPosition.toString());
+    return Column(
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: SliderTheme(
+                  data: SliderTheme.of(context)
+                      .copyWith(activeTickMarkColor: Colors.orange),
+                  child: Slider.adaptive(
+                      min: 0,
+                      max: widget.total,
+                      label: '${audioPosition.inMilliseconds}',
+                      value: audioPosition.inMilliseconds.toDouble(),
+                      onChanged: (double value) {
+                        audioPlayer.seek(Duration(milliseconds: value.toInt()));
+                      })),
+            ),
+            Text(widget.total.toString())
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            IconButton(icon: Icon(Icons.keyboard_arrow_left), onPressed: null),
+            Container(
+              decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor,
+                  boxShadow: [BoxShadow()],
+                  shape: BoxShape.circle),
+              child: StreamBuilder<AudioPlayerState>(
+                  stream: streamController.stream,
+                  initialData: AudioPlayerState.PLAYING,
+                  builder: (context, snapshot) {
+                    print(snapshot.data.toString());
+                    switch (snapshot.data) {
+                      case AudioPlayerState.STOPPED:
+                        return IconButton(
+                            icon: Icon(
+                              Icons.play_arrow,
+                              color: Theme.of(context).cardColor,
+                            ),
+                            onPressed: () {
+                              audioPlayer.play(currentMusic.url);
+                            });
+                        break;
+                      case AudioPlayerState.PLAYING:
+                        return IconButton(
+                            icon: Icon(
+                              Icons.pause,
+                              color: Theme.of(context).cardColor,
+                            ),
+                            onPressed: () {
+                              audioPlayer.pause();
+                            });
+                        break;
+                      case AudioPlayerState.PAUSED:
+                        return IconButton(
+                            icon: Icon(
+                              Icons.play_arrow,
+                              color: Theme.of(context).cardColor,
+                            ),
+                            onPressed: () {
+                              audioPlayer.resume();
+                            });
+                        break;
+                      case AudioPlayerState.COMPLETED:
+                        return IconButton(
+                            icon: Icon(
+                              Icons.play_arrow,
+                              color: Theme.of(context).cardColor,
+                            ),
+                            onPressed: () {
+                              audioPlayer.play(currentMusic.url);
+                            });
+                        break;
+                    }
+                    return IconButton(
+                        icon: Icon(
+                          Icons.play_arrow,
+                          color: Theme.of(context).cardColor,
+                        ),
+                        onPressed: () {
+                          audioPlayer.play(currentMusic.url);
+                        });
+                  }),
+            ),
+            IconButton(icon: Icon(Icons.keyboard_arrow_right), onPressed: null)
+          ],
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: <Widget>[
+            IconButton(icon: Icon(Icons.playlist_add), onPressed: null),
+            IconButton(icon: Icon(Icons.playlist_play), onPressed: null),
+            IconButton(
+                icon: Icon(Icons.replay),
+                onPressed: () {
+                  audioPlayer.setReleaseMode(ReleaseMode.LOOP);
+                }),
+            IconButton(icon: Icon(Icons.share), onPressed: null)
+          ],
+        ),
+        Center(
+          child: Container(
+              decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  boxShadow: [BoxShadow()],
+                  shape: BoxShape.circle),
+              child: IconButton(
+                icon: Icon(Icons.vertical_align_top),
+                onPressed: () {
+                  SmartRefresher.of(context).controller.twoLevelComplete();
+                },
+              )),
+        )
+      ],
+    );
   }
 }
 

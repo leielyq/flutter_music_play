@@ -7,6 +7,8 @@ import 'package:listenme/model/play_list_entity.dart';
 import 'package:listenme/generated/json/play_list_entity_helper.dart';
 import 'package:listenme/model/music_entity.dart';
 import 'package:listenme/generated/json/music_entity_helper.dart';
+import 'package:listenme/model/search_music_entity.dart';
+import 'package:listenme/generated/json/search_music_entity_helper.dart';
 
 class JsonConvert<T> {
 	T fromJson(Map<String, dynamic> json) {
@@ -22,7 +24,10 @@ class JsonConvert<T> {
 			return playListEntityFromJson(data as PlayListEntity, json) as T;			case PlayListCreator:
 			return playListCreatorFromJson(data as PlayListCreator, json) as T;			case MusicEntity:
 			return musicEntityFromJson(data as MusicEntity, json) as T;			case MusicArtist:
-			return musicArtistFromJson(data as MusicArtist, json) as T;    }
+			return musicArtistFromJson(data as MusicArtist, json) as T;			case SearchMusicEntity:
+			return searchMusicEntityFromJson(data as SearchMusicEntity, json) as T;			case SearchMusicAlbum:
+			return searchMusicAlbumFromJson(data as SearchMusicAlbum, json) as T;			case MusicArtist:
+			return searchMusicArtistFromJson(data as MusicArtist, json) as T;    }
     return data as T;
   }
 
@@ -31,7 +36,10 @@ class JsonConvert<T> {
 			return playListEntityToJson(data as PlayListEntity);			case PlayListCreator:
 			return playListCreatorToJson(data as PlayListCreator);			case MusicEntity:
 			return musicEntityToJson(data as MusicEntity);			case MusicArtist:
-			return musicArtistToJson(data as MusicArtist);    }
+			return musicArtistToJson(data as MusicArtist);			case SearchMusicEntity:
+			return searchMusicEntityToJson(data as SearchMusicEntity);			case SearchMusicAlbum:
+			return searchMusicAlbumToJson(data as SearchMusicAlbum);			case MusicArtist:
+			return searchMusicArtistToJson(data as MusicArtist);    }
     return data as T;
   }
   //Go back to a single instance by type
@@ -40,6 +48,9 @@ class JsonConvert<T> {
 			return PlayListEntity().fromJson(json);			case 'PlayListCreator':
 			return PlayListCreator().fromJson(json);			case 'MusicEntity':
 			return MusicEntity().fromJson(json);			case 'MusicArtist':
+			return MusicArtist().fromJson(json);			case 'SearchMusicEntity':
+			return SearchMusicEntity().fromJson(json);			case 'SearchMusicAlbum':
+			return SearchMusicAlbum().fromJson(json);			case 'SearchMusicArtist':
 			return MusicArtist().fromJson(json);    }
     return null;
   }
@@ -50,6 +61,9 @@ class JsonConvert<T> {
 			return List<PlayListEntity>();			case 'PlayListCreator':
 			return List<PlayListCreator>();			case 'MusicEntity':
 			return List<MusicEntity>();			case 'MusicArtist':
+			return List<MusicArtist>();			case 'SearchMusicEntity':
+			return List<SearchMusicEntity>();			case 'SearchMusicAlbum':
+			return List<SearchMusicAlbum>();			case 'SearchMusicArtist':
 			return List<MusicArtist>();    }
     return null;
   }
