@@ -6,7 +6,7 @@
 - [完美的咪咕API](http://api.migu.jsososo.com/) 开发很方便，统一了全局返回体（某些实体类也能统一就更完美了）。
 
 # 介绍：
-![image](https://github.com/CaiJingLong/some_asset/blob/master/image_picker1.gif)
+![image](https://github.com/leielyq/flutter_music_play/tree/master/res/1588660154473626.gif)
 
 # 目前进度：
 已经完成iOS和android端的开发。
