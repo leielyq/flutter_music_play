@@ -13,8 +13,10 @@ import 'package:listenme/Global.dart';
 import 'package:listenme/MyTabIndicator.dart';
 import 'package:listenme/NetWork.dart';
 import 'package:listenme/model/play_list_entity.dart';
+import 'package:listenme/play/PlayKits.dart';
 import 'package:listenme/search.dart';
 import 'package:listenme/ui/play_list_page.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'db/DatabaseProvider.dart';
@@ -48,7 +50,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     NetWork.init();
-
+    getTemporaryDirectory().then((Directory res){
+      print(res.path);
+    });
     return MultiProvider(
       child: MaterialApp(
         title: 'Flutter Demo',
@@ -259,6 +263,7 @@ class _MyHomePageState extends PageState<MyHomePage> {
                   });
                   audioPlayer.stop();
                   audioPlayer.play(currentMusic.url);
+                  PlayKits.play(currentMusic.url);
                   openTwoWidget();
                 },
               ),

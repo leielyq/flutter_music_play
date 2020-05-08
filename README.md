@@ -12,9 +12,8 @@
 已经完成iOS和android端的开发。
 pc端 采用go_flutter,已经配置完毕，等待audioplays的channl适配即可使用。
 
-iOS  testFlight 审核中
+iOS -[testFlight](https://testflight.apple.com/join/RZTsKXua)
 Android -[地址](http://d.7short.com/e7zd)
-
 
 # 开发基础：
 1.播放器是audioplayers.
